@@ -19,6 +19,10 @@ Resources:
       Tags:
       - Key: "Name"
         Value: "Tastylog-VPC"
+      - Key: "Project"
+        Value: "tastylog"
+      - Key: "Env"
+        Value: "dev"
 
 ###############################################################################
 # Route Table

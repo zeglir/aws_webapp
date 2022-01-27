@@ -1,0 +1,115 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Create RDS (MySQL)
+
+Parameters:
+  DBInstanceID:
+    Default: "tastylog-mysql-instance"
+    Description: "My database instance"
+    Type: String
+    MinLength: '1'
+    MaxLength: '63'
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9\\-]*' # needs \\ to escape character in JSON string 
+    ConstraintDescription: >- # YAML: discard last line-break and replace all line-break with space
+      Must begin with a letter and must not end with a hyphen or contain two
+      consecutive hyphens.
+  DBName:
+    Default: "tastylog"
+    Description: "MySQL: The name of the database to create when the DB instance is created."
+    Type: String
+    MinLength: '1'
+    MaxLength: '64'
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ConstraintDescription: "Must begin with a letter and contain only alphanumeric characters."
+  DBInstanceClass:
+    Default: "db.t2.micro"
+    Description: "DB instance class"
+    Type: String
+    ConstraintDescription: "Must select a valid DB instance type."
+  DBStorageType:
+    Default: "gp2"
+    Description: "Specifies the storage type to be associated with the DB instance."
+    Type: String
+    AllowedValues: [ "gp2", "io1", "standard" ]
+    ConstraintDescription: "standard = magnetic is deprecated"
+  DBAllocatedStorage:
+    Default: '20'
+    Description: "The size of the database (GiB)"
+    Type: Number
+    MinValue: '20'
+    MaxValue: '65536'
+    ConstraintDescription: "must be between 20 and 65536 GiB."
+  DBUsername:
+    Default: "admin"
+    NoEcho: 'true'
+    Description: "Username for MySQL database access"
+    Type: String
+    MinLength: '1'
+    MaxLength: '16'
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+    ConstraintDescription: "must begin with a letter and contain only alphanumeric characters."
+  DBPassword:
+    NoEcho: 'true'
+    Description: "Password MySQL database access"
+    Type: String
+    MinLength: '8'
+    MaxLength: '41'
+    AllowedPattern: '[a-zA-Z0-9]*'
+    ConstraintDescription: "must contain only alphanumeric characters."
+
+Resources:
+###############################################################################
+# DB Instance
+###############################################################################
+  TastylogDBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      #--------------------------------
+      # Basic
+      #--------------------------------
+      DBInstanceIdentifier: !Ref "DBInstanceID"
+      DBInstanceClass: !Ref "DBInstanceClass"
+      Engine: "MySQL"
+      EngineVersion: "8.0.27"
+      MasterUsername: !Ref "DBUsername"
+      MasterUserPassword: !Ref "DBPassword"
+      #--------------------------------
+      # Storage
+      #--------------------------------
+      StorageType: !Ref "DBStorageType"
+      AllocatedStorage: !Ref "DBAllocatedStorage"
+      MaxAllocatedStorage: "21"
+      #--------------------------------
+      # Availability and Durability
+      #--------------------------------
+      MultiAZ: "false"
+      #--------------------------------
+      # Connection 
+      #--------------------------------
+      # DBSubnetGroupName: !Ref "TastylogDBSubnetGroup"
+      DBSubnetGroupName: !ImportValue "TastylogDBSubnetParam-DBSubnetGroupName"
+      PubliclyAccessible: "false"
+      VPCSecurityGroups:
+        - !ImportValue "TastylogSG-dbSG"
+      AvailabilityZone: "ap-northeast-1a" # only when MultiAZ = false
+      # Port: "3306" # default 3306
+      #--------------------------------
+      # Additional
+      #--------------------------------
+      ## DB
+      DBName: !Ref "DBName"
+      # DBParameterGroupName: !Ref "TastylogDBParameterGroup"
+      DBParameterGroupName: !ImportValue "TastylogDBSubnetParam-DBParameterGroupName"
+      ## Backup
+      # BackupRetentionPeriod: "7"
+      # PreferredBackupWindow: "18:00-18:30" # UTC
+      # CopyTagsToSnapshot: "true"
+      # DeleteAutomatedBackups: "true"
+      ## Monitoring
+      # MonitoringInterval: '60'
+      # MonitoringRoleArn: 'arn:aws:iam::123456789012:role/rds-monitoring-role'
+      ## Maintenance
+      AllowMajorVersionUpgrade: "false"
+      AutoMinorVersionUpgrade: "false"
+      # PreferredMaintenanceWindow: "sun:19:00-sun:20:00" # UTC
+      ## Delete Protection
+      DeletionProtection: "false"

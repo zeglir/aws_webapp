@@ -1,0 +1,109 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Create new ALB (https)
+
+Parameters:
+  HostZoneId:
+    Description: "Route53 hosted zone id (Z0xxx)"
+    Type: String
+  CertificateDomain:
+    Description: "FQDN of the certificate domain name"
+    Type: String
+
+Resources:
+###############################################################################
+# Target Group
+###############################################################################
+  TastylogTG: 
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties: 
+      VpcId: !ImportValue "TastylogVPC-VPCID"
+      Name: "TastylogTG"
+      Protocol: "HTTP"
+      Port: "3000" # default listen port from ALB routing
+      HealthCheckProtocol: "HTTP"
+      HealthCheckPath: "/"
+      HealthCheckPort: "traffic-port" # the same port on which each target receives traffic from the ALB
+      HealthyThresholdCount: "5"
+      UnhealthyThresholdCount: "2"
+      HealthCheckTimeoutSeconds: "5"
+      HealthCheckIntervalSeconds: "30"
+      Matcher: 
+        HttpCode: "200"
+      Targets: 
+        - Id: !ImportValue "TastylogEC2-ApServer1A"
+          Port: "3000" # can overwrite TargetGroup default listen port
+        - Id: !ImportValue "TastylogEC2-ApServer1C"
+          Port: "3000" # can overwrite TargetGroup default listen port
+
+###############################################################################
+# ALB: Application Load Balancer
+###############################################################################
+  TastylogALB: 
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties: 
+      Name: "TastylogALB"
+      Scheme: "internet-facing"
+      LoadBalancerAttributes: 
+        - Key: "deletion_protection.enabled"
+          Value: "false"
+        - Key: "idle_timeout.timeout_seconds"
+          Value: "4000"
+      SecurityGroups:
+        - !ImportValue "TastylogSG-webSG"
+      Subnets: 
+        - !ImportValue "TastylogVPC-PublicSubnet1A"
+        - !ImportValue "TastylogVPC-PublicSubnet1C"
+
+  ALBListenerHTTP: 
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties: 
+      Port: "80" # ALB listen port from the internet
+      Protocol: "HTTP"
+      LoadBalancerArn: !Ref "TastylogALB"
+      DefaultActions: 
+        - Type: redirect # Redirect HTTP request to HTTPS
+          RedirectConfig: 
+            Host: '#{host}'
+            Path: '/#{path}'
+            Port: 443
+            Protocol: HTTPS
+            Query: '#{query}'
+            StatusCode: HTTP_301
+
+  ALBListenerHTTPS:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      Port: "443"  # ALB listen port from the internet
+      Protocol: "HTTPS"
+      LoadBalancerArn: !Ref "TastylogALB"
+      Certificates:
+        - CertificateArn: !Ref "TastylogCertificate"
+      DefaultActions:
+        - TargetGroupArn: !Ref "TastylogTG"
+          Type: "forward"
+
+###############################################################################
+# ACM: AWS Certificate Manager
+###############################################################################
+  TastylogCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Sub "${CertificateDomain}"
+      DomainValidationOptions:
+        - DomainName: !Sub "${CertificateDomain}"
+          HostedZoneId: !Sub "${HostZoneId}"
+      ValidationMethod: "DNS" # automatically register Route53 CNAME record to validate domain ownership
+
+###############################################################################
+# Route53 RecordSet
+###############################################################################
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Sub "${HostZoneId}"
+      Comment: "DNS for ALB"
+      Name: !Sub "${CertificateDomain}"
+      Type: "A"
+      AliasTarget:
+        HostedZoneId: !GetAtt "TastylogALB.CanonicalHostedZoneID"
+        DNSName: !GetAtt "TastylogALB.DNSName"

@@ -1,0 +1,16 @@
+事前準備
+・独自ドメインを取得する
+・Route53で、独自ドメインのホストゾーンを作成する
+・freenomでドメインを取得した場合は、
+　freenomの Nameservers管理画面から、Use custom nameservers を指定して、
+　ホストゾーンの NSレコードに設定されたネームサーバ群をすべて登録しておく。
+・ホストゾーンのID（Z0～）を、パラメータストアに指定のキーで登録する。/tastylog/dev/app/DNS_HOSTZONE
+
+・必須ではないが、独自ドメインのDNS登録が正しく登録されたかは、
+　Route53に Aレコードのルーティングを追加して、
+　nslookup や独自ドメインでのアクセスが正しく行われることを確認する。
+
+後処理
+・スタックを削除しても、Route53に自動登録される証明書検証用のCNAMEレコードが残るので、手動で削除する。
+・ホストゾーンを手動で削除する。
+・パラメータストアのホストゾーンIDを削除する。aws ssm delete-parameters --name /tastylog/dev/app/DNS_HOSTZONE
