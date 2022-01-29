@@ -1,0 +1,16 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Create S3 Bucket test
+
+Resources:
+###############################################################################
+# S3 Bucket
+###############################################################################
+  S3BucketWebStatic:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: "udemy-test-bucket-20220129-113000"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: "true"
+        BlockPublicPolicy: "true"
+        IgnorePublicAcls: "true"
+        RestrictPublicBuckets: "true"

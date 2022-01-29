@@ -8,6 +8,9 @@ Parameters:
   CertificateDomain:
     Description: "FQDN of the certificate domain name"
     Type: String
+  DomainPrefixForALB:
+    Description: "domain name prefix for ALB access : prefix + CertificateDomain"
+    Type: String
 
 Resources:
 ###############################################################################
@@ -88,22 +91,32 @@ Resources:
   TastylogCertificate:
     Type: AWS::CertificateManager::Certificate
     Properties:
+      # certificate for naked domain(example.com) and subdomain(www.example.com, test.example.com ...)
       DomainName: !Sub "${CertificateDomain}"
+      SubjectAlternativeNames:
+        - !Sub "*.${CertificateDomain}"
       DomainValidationOptions:
         - DomainName: !Sub "${CertificateDomain}"
-          HostedZoneId: !Sub "${HostZoneId}"
-      ValidationMethod: "DNS" # automatically register Route53 CNAME record to validate domain ownership
+          HostedZoneId: !Sub "${HostZoneId}" # ACM adds Route53 CNAME record to validate domain ownership
+      ValidationMethod: "DNS"
 
 ###############################################################################
 # Route53 RecordSet
 ###############################################################################
-  DnsRecord:
+  DnsRecordALB:
     Type: AWS::Route53::RecordSet
     Properties:
       HostedZoneId: !Sub "${HostZoneId}"
       Comment: "DNS for ALB"
-      Name: !Sub "${CertificateDomain}"
+      Name: !Sub "${DomainPrefixForALB}.${CertificateDomain}"
       Type: "A"
       AliasTarget:
         HostedZoneId: !GetAtt "TastylogALB.CanonicalHostedZoneID"
         DNSName: !GetAtt "TastylogALB.DNSName"
+
+Outputs:
+  StackDnsRecordALBDomainName:
+    Description: "The domain name of ALB"
+    Value: !Ref "DnsRecordALB" # alb.example.com
+    Export:
+      Name: !Sub "${AWS::StackName}-ALBDomainName"
