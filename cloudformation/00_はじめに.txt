@@ -1,0 +1,25 @@
+使用パターンは以下のとおり。
+
+■VPC／Security Group
+10_vpc_create_TastylogVPC.bat
+20_sg_base_create_TastylogSG.bat
+---------------------------------------
+■分岐１－１：EC2／ALB
+┗ 30_ec2_create_TastylogEC2.bat
+  ┗ 40_alb_create_TastylogALB_http.bat
+  ┗ 41_alb_create_TastylogALB_https.bat
+
+■分岐１－２：Role／Launch Template／ALB／ASG
+┗ 25_role_create_TastylogRole.bat
+  30v2_ec2_create_TastylogLT.bat
+  ┗ 40v2_alb_create_TastylogALB_ASG_http.bat
+  ┗ 41v2_alb_create_TastylogALB_ASG_https.bat
+---------------------------------------
+■RDS
+■（20が終わっていること）
+┗ 50_rds_create_TastylogDBSubnetParam.bat
+  51_rds_create_TastylogRDS.bat
+
+■CloudFront
+■（41か、41v2 が終わっていること）
+    ┗ 60_cf_create_TastylogCF.bat

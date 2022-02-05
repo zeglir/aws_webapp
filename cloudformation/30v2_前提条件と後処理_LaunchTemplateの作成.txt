@@ -1,0 +1,44 @@
+事前準備
+※ミドルウェア（Node.jsなど）のインストールまで終えたEC2インスタンスから AMIイメージを作成する。
+　起動テンプレートでは、AMIイメージから起動して、
+　最新のアプリケーションモジュールを毎回、S3バケットから取得してインストールする。
+
+・EC2インスタンスから S3バケット内のアプリケーションモジュールをロードするので、
+　S3バケットを作成して、モジュールを事前にアップロードしておく。
+　・アップロードするものは「1504-カスタムAMIから起動」の以下の2ファイル
+　　 latest
+     tastylog-app-1.8.1.tar.gz
+     ※initialize.sh は、その内容を CloudFormationの起動テンプレートの UserDataとして設定済み。
+　・バケットポリシーは CloudFormationで作るので設定しなくてよい。
+
+・S3バケットのバケット名を、パラメータストアに設定しておく。/tastylog/dev/app/EC2_REPOSITORY_S3_BUCKET_NAME
+
+・起動テンプレートから参照するAMIを作成する。
+　任意のEC2インスタンスを立ち上げて、「1503-カスタムAMIの作成」の tastylog-mw-all-1.0.0.tar.gz を SCPでアップロードする。
+　ミドルウェアのインストールは以下で行う。
+　# mkdir middleware
+  # tar xvzf tastylog-mw-all-1.0.0.tar.gz -C middleware
+  # cd middleware
+  # sudo ./install.sh
+
+  実行後は、サービス2つが登録されているか確認（サービスの起動はしていない）
+  $ systemctl list-unit-files | grep load-params
+  $ systemctl list-unit-files | grep tastylog
+  $ cat /etc/params
+  #
+  # [2022-02-05T10:52:12+09:00] Initialized scripts.
+  #
+  INSTANCE_ID=i-06aabdaa129bbb243
+  REGION=ap-northeast-1
+  ZONE=ap-northeast-1c
+  VPC_ID=vpc-04b60699bb7b82df0
+  VPC_NAME="Tastylog-VPC"
+  VPC_PROJECT="tastylog"
+  VPC_ENV="dev"
+  EC2_NAME=""
+  EC2_TYPE="app"
+  ～以下略～
+
+・AMIの IDをパラメータストアに登録する。/tastylog/dev/app/EC2_AMI_ID_LAUNCH_TEMPLATE
+
+後処理

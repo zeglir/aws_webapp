@@ -1,0 +1,114 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Create new ALB (http) with ASG
+
+Resources:
+###############################################################################
+# Target Group
+###############################################################################
+  TastylogTG:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties: 
+      VpcId: !ImportValue "TastylogVPC-VPCID"
+      Name: "TastylogTG"
+      Protocol: "HTTP"
+      Port: "3000" # default listen port from ALB routing
+      HealthCheckProtocol: "HTTP"
+      HealthCheckPath: "/"
+      HealthCheckPort: "traffic-port" # the same port on which each target receives traffic from the ALB
+      HealthyThresholdCount: "5"
+      UnhealthyThresholdCount: "2"
+      HealthCheckTimeoutSeconds: "5"
+      HealthCheckIntervalSeconds: "30"
+      Matcher: 
+        HttpCode: "200"
+      # Targets: 
+      #   - Id: !ImportValue "TastylogEC2-ApServer1A"
+      #     Port: "3000" # can overwrite TargetGroup default listen port
+      #   - Id: !ImportValue "TastylogEC2-ApServer1C"
+      #     Port: "3000" # can overwrite TargetGroup default listen port
+
+###############################################################################
+# ALB: Application Load Balancer
+###############################################################################
+  TastylogALB: 
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties: 
+      Name: "TastylogALB"
+      Scheme: "internet-facing"
+      LoadBalancerAttributes: 
+        - Key: "deletion_protection.enabled"
+          Value: "false"
+        - Key: "idle_timeout.timeout_seconds"
+          Value: "4000"
+      SecurityGroups:
+        - !ImportValue "TastylogSG-webSG"
+      Subnets: 
+        - !ImportValue "TastylogVPC-PublicSubnet1A"
+        - !ImportValue "TastylogVPC-PublicSubnet1C"
+
+  ALBListenerHTTP: 
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties: 
+      Port: "80" # ALB listen port from the internet
+      Protocol: "HTTP"
+      LoadBalancerArn: !Ref "TastylogALB"
+      DefaultActions:
+        - TargetGroupArn: !Ref "TastylogTG"
+          Type: "forward"
+
+###############################################################################
+# ASG: Auto Scaling Group
+###############################################################################
+  TastylogASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: "Tastylog-ASG"
+      #--------------------------------
+      # Launch Template
+      #--------------------------------
+      LaunchTemplate:
+        LaunchTemplateId: !ImportValue "TastylogLT-LT"
+        # LatestVersionNumber or DefaultVersionNumber 
+        Version: !ImportValue "TastylogLT-LT-LatestVersionNumber"
+      #--------------------------------
+      # Network
+      #--------------------------------
+      # You must specify one of the following properties:
+      # VPCZoneIdentifier or AvailabilityZones.
+      VPCZoneIdentifier:
+        - !ImportValue "TastylogVPC-PublicSubnet1A"
+        - !ImportValue "TastylogVPC-PublicSubnet1C"
+      #--------------------------------
+      # ALB
+      #--------------------------------
+      TargetGroupARNs:
+        - !Ref "TastylogTG"
+      #--------------------------------
+      # Health Check
+      #--------------------------------
+      HealthCheckType: "EC2" # EC2(default) or ELB
+      # The amount of time, in seconds, that ASG waits before checking the health status of an EC2 instance 
+      # that has come into service and marking it unhealthy due to a failed health check.
+      HealthCheckGracePeriod: "300"
+      #--------------------------------
+      # Auto Scaling Group Size
+      #--------------------------------
+      DesiredCapacity: "1"
+      MinSize: "1"
+      MaxSize: "2"
+      #--------------------------------
+      # etc
+      #--------------------------------
+      NewInstancesProtectedFromScaleIn: "false"
+
+  TastylogScalingPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref TastylogASG
+      PolicyType: "TargetTrackingScaling"
+      EstimatedInstanceWarmup: "300"
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: "ASGAverageCPUUtilization"
+        TargetValue: "10"
+        DisableScaleIn: "false"

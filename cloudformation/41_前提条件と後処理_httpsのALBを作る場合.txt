@@ -7,6 +7,8 @@
 　freenomの Nameservers管理画面から、Use custom nameservers を指定して、
 　ホストゾーンの NSレコードに設定されたネームサーバ群をすべて登録しておく。
 ・ホストゾーンのID（Z0～）を、パラメータストアに指定のキーで登録する。/tastylog/dev/app/DNS_HOSTZONE
+・ドメイン名を、パラメータストアに指定のキーで登録する。 /tastylog/dev/app/DNS_DOMAIN
+
 ・PCのDNSサーバを、反映が速いパブリックDNSサーバに切り替える
 
 ・必須ではないが、独自ドメインのDNS登録が正しく登録されたかは、

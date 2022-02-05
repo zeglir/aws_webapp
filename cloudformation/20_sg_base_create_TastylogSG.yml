@@ -100,16 +100,22 @@ Resources:
       GroupDescription: "tastylog application server security group "
       VpcId: !ImportValue "TastylogVPC-VPCID"
       SecurityGroupEgress:
-        - Description: "for http"
+        - Description: "for http : S3"
           IpProtocol: "tcp"
           FromPort: "80"
           ToPort: "80"
           DestinationPrefixListId: !Ref "PrefixIdS3" # managed prefix list: com.amazonaws.ap-northeast-1.s3
-        - Description: "for https"
+        - Description: "for https : S3"
           IpProtocol: "tcp"
           FromPort: "443"
           ToPort: "443"
           DestinationPrefixListId: !Ref "PrefixIdS3" # managed prefix list: com.amazonaws.ap-northeast-1.s3
+        # needs if use Systems Manager Session Manager
+        - Description: "for https (Systems Manager Session Manager)"
+          IpProtocol: "tcp"
+          FromPort: "443"
+          ToPort: "443"
+          CidrIp: !Ref "IpRangeAll" # allow all https outbound
 
   # Using embedded ingress and egress rules which contain cross-reference two security groups
   # causes circular depencency error.

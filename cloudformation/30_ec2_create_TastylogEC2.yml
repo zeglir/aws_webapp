@@ -87,6 +87,9 @@ Resources:
             InstanceInterruptionBehavior: "terminate" # hibernate | stop | terminate
             MaxPrice: !Ref "AWS::NoValue" # OnDemand
             SpotInstanceType: "one-time" # one-time | persistent
+        # attach IAM role
+        IamInstanceProfile:
+          Name: !ImportValue "TastylogRole-InstanceProfileName"
 
 Outputs:
   StackTastylogApServer1A:

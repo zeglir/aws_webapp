@@ -38,7 +38,9 @@ IF "%1"=="check" (
   GOTO :END
 )
 
+REM -------------------------------------------------------
 REM パラメータストアから値を取得（CDNコンテンツ用 S3バケット名）
+REM -------------------------------------------------------
 FOR /F "usebackq delims=" %%A in (
   ` ^
   aws ssm get-parameter ^
@@ -60,7 +62,9 @@ IF NOT DEFINED SSM_CDN_S3_BUCKET_NAME (
   ECHO Success: aws ssm get-parameter SSM_CDN_S3_BUCKET_NAME
 )
 
+REM -------------------------------------------------------
 REM パラメータストアから値を取得（ホストゾーン）
+REM -------------------------------------------------------
 FOR /F "usebackq delims=" %%A in (
   ` ^
   aws ssm get-parameter ^
@@ -82,7 +86,9 @@ IF NOT DEFINED SSM_DNS_HOSTZONE (
   ECHO Success: aws ssm get-parameter DNS_HOSTZONE
 )
 
+REM -------------------------------------------------------
 REM パラメータストアから値を取得（ドメイン名）
+REM -------------------------------------------------------
 FOR /F "usebackq delims=" %%A in (
   ` ^
   aws ssm get-parameter ^
@@ -104,7 +110,9 @@ IF NOT DEFINED SSM_DNS_DOMAIN (
   ECHO Success: aws ssm get-parameter DNS_DOMAIN
 )
 
+REM -------------------------------------------------------
 REM パラメータストアから値を取得（ドメイン名接頭辞：CloudFormation用）
+REM -------------------------------------------------------
 FOR /F "usebackq delims=" %%A in (
   ` ^
   aws ssm get-parameter ^
@@ -126,8 +134,10 @@ IF NOT DEFINED SSM_DNS_DOMAIN_PREFIX_CF (
   ECHO Success: aws ssm get-parameter SSM_DNS_DOMAIN_PREFIX_CF
 )
 
+REM -------------------------------------------------------
 REM デプロイ実行（ACM）
 REM CloudFront用の証明書なので us-east-1 リージョンで実行する必要がある
+REM -------------------------------------------------------
 aws cloudformation deploy %CHANGESET_OPTION% ^
 --stack-name %CFN_ACM_STACK_NAME% ^
 --template-file %CFN_ACM_TEMPLATE% ^
@@ -144,8 +154,10 @@ IF ERRORLEVEL 1 (
   ECHO Success: aws cloudformation deploy "ACM"
 )
 
+REM -------------------------------------------------------
 REM 証明書のARN取得
 REM cross region になるため、証明書のARNは Export & ImportValueで参照できない
+REM -------------------------------------------------------
 FOR /F "usebackq delims=" %%A in (
   ` ^
   aws acm list-certificates ^
@@ -166,7 +178,9 @@ IF NOT DEFINED ACM_CERTIFICATE_CF (
   ECHO Success: aws list-certificates "%ACM_CERTIFICATE_CF%"
 )
 
+REM -------------------------------------------------------
 REM デプロイ実行（CloudFront）
+REM -------------------------------------------------------
 aws cloudformation deploy %CHANGESET_OPTION% ^
 --stack-name %CFN_STACK_NAME% ^
 --template-file %CFN_TEMPLATE% ^
@@ -185,6 +199,9 @@ IF ERRORLEVEL 1 (
   GOTO :NORMEND
 )
 
+REM -------------------------------------------------------
+REM 終了処理
+REM -------------------------------------------------------
 :ERREND
 ECHO エラー発生[%ERRORLEVEL%]
 GOTO :END

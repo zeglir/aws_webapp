@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Create Role
+
+Parameters:
+  TastylogRoleNamePrefix:
+    Type: String
+    Default: "Tastylog-EC2-Role"
+
+Resources:
+###############################################################################
+# Role
+###############################################################################
+  TastylogEC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: "Allows EC2 instances to call AWS services on your behalf."
+      # The trust policy definition
+      # IAM JSON policy elements reference
+      # https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements.html
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              # https://dev.classmethod.jp/articles/iam-role-passrole-assumerole/
+              # https://docs.aws.amazon.com/ja_jp/service-authorization/latest/reference/reference.html
+              # sts: Security Token Service
+              # AssumeRole: Returns a set of temporary security credentials that you can use to access AWS resources
+              # As a result of this, "Principal" get "Effect" to use this role via Security Token Service
+              - "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess"
+        - "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+        - "arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess"
+        # for Systems Manager Session Manager
+        - "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+      # Important 1: 
+      # Naming an IAM resource can cause an unrecoverable error if you reuse the same template in multiple Regions.
+      # To prevent this, we recommend using Fn::Join and AWS::Region to create a Region-specific name
+      #
+      # Important 2:
+      # If your template includes custom names for IAM resources, you must specify CAPABILITY_NAMED_IAM.
+      # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html#cfn-iam-role-rolename
+      # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-iam-template.html#using-iam-capabilities
+      RoleName: !Join ["-", [!Sub "${TastylogRoleNamePrefix}", !Ref "AWS::Region"]]
+
+###############################################################################
+# Instance Profile (needs attaching role to EC2 instance)
+###############################################################################
+  TastylogInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      # InstanceProfileName: ""
+      Path: "/"
+      Roles:
+        - !Ref "TastylogEC2Role"
+
+Outputs:
+  StackTastylogInstanceProfileName:
+    Description: "Tastylog Instance Profile"
+    Value: !Ref "TastylogInstanceProfile"
+    Export:
+      Name: !Sub "${AWS::StackName}-InstanceProfileName"

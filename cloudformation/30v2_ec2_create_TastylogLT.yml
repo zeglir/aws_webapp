@@ -1,0 +1,109 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Create Launch Template
+
+Parameters:
+  Ec2ImageId:
+    Description: "Template source AMI ID"
+    Type: String
+  Ec2InstanceType:
+    Type: String
+    Default: "t2.micro"
+  KeyName: 
+    Description: "Name of an existing EC2 KeyPair."
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: "aws-udemy"
+    ConstraintDescription : "Can contain only ASCII characters."
+  S3RepositoryBucket:
+    Description: "S3 bucket name of tastylog setup files"
+    Type: String
+
+Resources:
+###############################################################################
+# Launch Template
+###############################################################################
+  TastylogLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: "Tastylog-launchTemplate"
+      LaunchTemplateData:
+        BlockDeviceMappings:
+          - DeviceName: "/dev/xvda"
+            Ebs:
+              DeleteOnTermination: "true" # the EBS volume is deleted on instance termination (default)
+              VolumeType: "gp2" # General Purpose SSD (default)
+              VolumeSize: "8" # 8GB (default)
+        ImageId: !Ref "Ec2ImageId"
+        InstanceType: !Ref "Ec2InstanceType"
+        InstanceMarketOptions:
+          MarketType: "spot"
+          SpotOptions:
+            InstanceInterruptionBehavior: "terminate" # hibernate | stop | terminate
+            MaxPrice: !Ref "AWS::NoValue" # OnDemand
+            SpotInstanceType: "one-time" # one-time | persistent
+        # attach IAM role
+        IamInstanceProfile:
+          Name: !ImportValue "TastylogRole-InstanceProfileName"
+        KeyName: !Ref "KeyName"
+        NetworkInterfaces: 
+          - AssociatePublicIpAddress: "true"
+            DeviceIndex: "0"
+            Groups: 
+              - !ImportValue "TastylogSG-adminSG"
+              - !ImportValue "TastylogSG-apSG"
+            # here does not specify subnet id. That will be set in ASG setting.
+        TagSpecifications:
+          - ResourceType: "instance"
+            # refer from the scripts which sets the tastylog environments
+            Tags:
+              - Key: "Type"
+                Value: "app"
+        UserData:
+          Fn::Base64: !Sub |
+              #!/bin/bash
+              # ---------------------------------
+              # EC2 user data
+              # Autoscaling startup scripts.
+              # ---------------------------------
+              APP_NAME=tastylog
+              BUCKET_NAME=${S3RepositoryBucket}
+              CWD=/home/ec2-user
+
+              # Log output setting
+              LOGFILE="/var/log/initialize.log"
+              exec > "${!LOGFILE}"
+              exec 2>&1
+
+              # Change current work directory
+              cd ${!CWD}
+
+              # Get latest version number.
+              aws s3 cp s3://${!BUCKET_NAME}/latest ${!CWD}
+
+              # Get latest resources.
+              aws s3 cp s3://${!BUCKET_NAME}/${!APP_NAME}-app-$(cat ./latest).tar.gz ${!CWD}
+
+              # Decompress tar.gz
+              rm -rf ${!CWD}/${!APP_NAME}
+              mkdir -p ${!CWD}/${!APP_NAME}
+              tar -zxvf "${!CWD}/${!APP_NAME}-app-$(cat ./latest).tar.gz" -C "${!CWD}/${!APP_NAME}"
+
+              # Move to application directory
+              sudo rm -rf /opt/${!APP_NAME}
+              sudo mv ${!CWD}/${!APP_NAME} /opt/
+
+              # Boot application 
+              sudo systemctl enable tastylog
+              sudo systemctl start tastylog
+
+Outputs:
+  StackTastylogLaunchTemplateId:
+    Description: "The ID of the Tastylog LaunchTemplate"
+    Value: !Ref "TastylogLaunchTemplate"
+    Export:
+      Name: !Sub "${AWS::StackName}-LT"
+
+  StackTastylogLaunchTemplateLatestVersionNo:
+    Description: "The Latest Version No of the Tastylog LaunchTemplate"
+    Value: !GetAtt "TastylogLaunchTemplate.LatestVersionNumber"
+    Export:
+      Name: !Sub "${AWS::StackName}-LT-LatestVersionNumber"

@@ -11,8 +11,8 @@ REM
 REM 構文： SET 変数名=設定値
 REM 　・変数名 = 設定値 のように代入演算子の左右に空白を入れないこと
 REM ----------------------------------------------------------------------------
-SET CFN_STACK_NAME=UdemyTestS3
-SET CFN_TEMPLATE=zz_test_create_S3Bucket.yml
+SET CFN_STACK_NAME=TastylogALB
+SET CFN_TEMPLATE=40v2_alb_create_TastylogALB_ASG_http.yml
 SET CHANGESET_OPTION=--no-execute-changeset
 
 REM ----------------------------------------------------------------------------
@@ -31,36 +31,15 @@ IF "%1"=="check" (
 ) ELSE (
   REM ECHOで |<>&^ を出力するには ^ でエスケープ。%を出力するには %%で
   ECHO 実行方法： %0 [check^|deploy]
-  GOTO :END
+  GOTO :EOF
 )
 
 REM ----------------------------------------------------------------------------
 REM 実行
 REM ----------------------------------------------------------------------------
+aws cloudformation deploy --stack-name %CFN_STACK_NAME% --template-file %CFN_TEMPLATE% %CHANGESET_OPTION%
 
-REM デプロイ実行
-aws cloudformation deploy %CHANGESET_OPTION% ^
---stack-name %CFN_STACK_NAME% ^
---template-file %CFN_TEMPLATE%
-
-REM エラーハンドリング
-IF ERRORLEVEL 1 (
-  ECHO Failed: aws cloudformation deploy
-  GOTO :ERREND
-) ELSE (
-  ECHO Success: aws cloudformation deploy
-  GOTO :NORMEND
-)
-
-:ERREND
-ECHO エラー発生[%ERRORLEVEL%]
-GOTO :END
-
-:NORMEND
-ECHO 正常終了[%ERRORLEVEL%]
-GOTO :END
-
-:END
-REM 一時停止
-REM PAUSE
-EXIT /B
+REM :EOF は事前定義のラベル。ファイル末尾までジャンプする。
+REM 他のラベルと異なり、GOTO :EOF のように先頭にコロンをつける
+PAUSE
+GOTO :EOF
