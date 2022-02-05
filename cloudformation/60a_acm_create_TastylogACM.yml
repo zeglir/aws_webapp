@@ -1,0 +1,26 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Create new ACM (for CloudFornt) in us-east-1 Region
+
+Parameters:
+  HostZoneId:
+    Description: "Route53 hosted zone id (Z0xxx)"
+    Type: String
+  CertificateDomain:
+    Description: "FQDN of the certificate domain name"
+    Type: String
+
+Resources:
+###############################################################################
+# ACM: AWS Certificate Manager
+###############################################################################
+  TastylogCertificateForCF:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      # certificate for naked domain(example.com) and subdomain(www.example.com, test.example.com ...)
+      DomainName: !Sub "${CertificateDomain}"
+      SubjectAlternativeNames:
+        - !Sub "*.${CertificateDomain}"
+      DomainValidationOptions:
+        - DomainName: !Sub "${CertificateDomain}"
+          HostedZoneId: !Sub "${HostZoneId}" # ACM adds Route53 CNAME record to validate domain ownership
+      ValidationMethod: "DNS"

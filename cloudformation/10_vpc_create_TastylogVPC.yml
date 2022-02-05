@@ -1,0 +1,190 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description:
+  VPC & subnet create
+
+# AWS CloudFormation VPC template
+# https://docs.aws.amazon.com/ja_jp/codebuild/latest/userguide/cloudformation-vpc-template.html
+
+Resources:
+###############################################################################
+# VPC
+###############################################################################
+  TastylogVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: "192.168.0.0/20"
+      EnableDnsSupport: "true"
+      EnableDnsHostnames: "true"
+      InstanceTenancy: "default"
+      Tags:
+      - Key: "Name"
+        Value: "Tastylog-VPC"
+      - Key: "Project"
+        Value: "tastylog"
+      - Key: "Env"
+        Value: "dev"
+
+###############################################################################
+# Route Table
+###############################################################################
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref "TastylogVPC"
+      Tags:
+      - Key: "Name"
+        Value: "Tastylog-VPC-PublicRT"
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref "TastylogVPC"
+      Tags:
+      - Key: "Name"
+        Value: "Tastylog-VPC-PrivateRT"
+
+# https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-attribute-dependson.html#gatewayattachment
+# When a DependsOn attribute is required
+#
+# VPC-gateway attachment
+# 
+# Some resources in a VPC require a gateway (either an Internet or VPN gateway). 
+# If your CloudFormation template defines a VPC, a gateway, and a gateway attachment, 
+# any resources that require the gateway are dependent on the gateway attachment. 
+# For example, an Amazon EC2 instance with a public IP address is dependent on the VPC-gateway attachment 
+# if the VPC and InternetGateway resources are also declared in the same template.
+# 
+# Currently, the following resources depend on a VPC-gateway attachment 
+# when they have an associated public IP address and are in a VPC.
+#    Auto Scaling groups
+#    Amazon EC2 instances
+#    Elastic Load Balancing load balancers
+#    Elastic IP addresses
+#    Amazon RDS database instances
+#    Amazon VPC routes that include the Internet gateway
+  RouteIGW:
+    Type: AWS::EC2::Route
+    DependsOn: "AttachSampleInternetGateway"
+    Properties:
+      RouteTableId: !Ref "PublicRouteTable"
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref "SampleInternetGateway"
+
+###############################################################################
+# Subnet
+###############################################################################
+  PublicSubnet1A:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref "TastylogVPC"
+      CidrBlock: "192.168.1.0/24"
+      AvailabilityZone: "ap-northeast-1a"
+      MapPublicIpOnLaunch : "true"  # instances launched in this subnet receive a public IPv4 address
+      Tags:
+      - Key: "Name"
+        Value: "Tastylog-public-subnet-1a"
+
+  PubSubnet1ARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref "PublicSubnet1A"
+      RouteTableId: !Ref "PublicRouteTable"
+
+  PublicSubnet1C:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref "TastylogVPC"
+      CidrBlock: "192.168.2.0/24"
+      AvailabilityZone: "ap-northeast-1c"
+      MapPublicIpOnLaunch : "true"  # instances launched in this subnet receive a public IPv4 address
+      Tags:
+      - Key: "Name"
+        Value: "Tastylog-public-subnet-1c"
+
+  PubSubnet1CRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref "PublicSubnet1C"
+      RouteTableId: !Ref "PublicRouteTable"
+
+  PrivateSubnet1A:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref "TastylogVPC"
+      CidrBlock: "192.168.3.0/24"
+      AvailabilityZone: "ap-northeast-1a"
+      MapPublicIpOnLaunch : "false"  # instances launched in this subnet receive a public IPv4 address
+      Tags:
+      - Key: "Name"
+        Value: "Tastylog-private-subnet-1a"
+
+  PriSubnet1ARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref "PrivateSubnet1A"
+      RouteTableId: !Ref "PrivateRouteTable"
+
+  PrivateSubnet1C:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref "TastylogVPC"
+      CidrBlock: "192.168.4.0/24"
+      AvailabilityZone: "ap-northeast-1c"
+      MapPublicIpOnLaunch : "false"  # instances launched in this subnet receive a public IPv4 address
+      Tags:
+      - Key: "Name"
+        Value: "Tastylog-private-subnet-1c"
+
+  PriSubnet1CRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref "PrivateSubnet1C"
+      RouteTableId: !Ref "PrivateRouteTable"
+
+###############################################################################
+# Internet Gateway
+###############################################################################
+  SampleInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: "Name"
+        Value: "Tastylog-ING"
+
+  AttachSampleInternetGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref "TastylogVPC"
+      InternetGatewayId: !Ref "SampleInternetGateway"
+
+Outputs:
+  StackVPC:
+    Description: "The ID of the VPC"
+    Value: !Ref "TastylogVPC"
+    Export:
+      Name: !Sub "${AWS::StackName}-VPCID"
+
+  StackPublicSubnet1A:
+    Description: "The ID of the VPC Subnet"
+    Value: !Ref "PublicSubnet1A"
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnet1A"
+
+  StackPublicSubnet1C:
+    Description: "The ID of the VPC Subnet"
+    Value: !Ref "PublicSubnet1C"
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnet1C"
+
+  StackPrivateSubnet1A:
+    Description: "The ID of the VPC Subnet"
+    Value: !Ref "PrivateSubnet1A"
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnet1A"
+
+  StackPrivateSubnet1C:
+    Description: "The ID of the VPC Subnet"
+    Value: !Ref "PrivateSubnet1C"
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnet1C"
+

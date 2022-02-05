@@ -1,0 +1,42 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Create DB SubnetGroup and ParameterGroup (MySQL)
+
+Resources:
+###############################################################################
+# DB Subnet Group
+###############################################################################
+  TastylogDBSubnetGroup: 
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      # Must contain no more than 255 lowercase alphanumeric characters or hyphens.
+      DBSubnetGroupName: "tastylog-db-subnetgroup"
+      DBSubnetGroupDescription: "Tastylog RDS Subnet Group"
+      SubnetIds: 
+        - !ImportValue "TastylogVPC-PrivateSubnet1A"
+        - !ImportValue "TastylogVPC-PrivateSubnet1C"
+
+###############################################################################
+# DB Parameter Group
+###############################################################################
+  # [AWS::RDS::DBParameterGroup] No apparent way to set group name
+  # https://github.com/awsdocs/aws-cloudformation-user-guide/issues/450
+  TastylogDBParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: "Tastylog MySQL Parameter Group"
+      Family: "mysql8.0"
+      Parameters:
+        sql_mode: "STRICT_TRANS_TABLES, NO_ENGINE_SUBSTITUTION, ONLY_FULL_GROUP_BY"
+
+Outputs:
+  StackTastylogDBSubnetGroup:
+    Description: "the name of the DB subnet group"
+    Value: !Ref "TastylogDBSubnetGroup"
+    Export:
+      Name: !Sub "${AWS::StackName}-DBSubnetGroupName"
+
+  StackTastylogDBParameterGroup:
+    Description: "the name of the DB parameter group"
+    Value: !Ref "TastylogDBParameterGroup"
+    Export:
+      Name: !Sub "${AWS::StackName}-DBParameterGroupName"

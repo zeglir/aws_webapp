@@ -1,0 +1,198 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: Create Security Group
+Parameters:
+  IpRangeAll:
+    Description: "IP address range that can be used to SSH to the EC2 instances"
+    Type: "String"
+    MinLength: "9"
+    MaxLength: "18"
+    Default: "0.0.0.0/0"
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: "must be a valid IP CIDR range of the form x.x.x.x/x."
+
+  PrefixIdS3:
+    Description: "managed prefix list: com.amazonaws.ap-northeast-1.s3"
+    Type: "String"
+    Default: "pl-61a54008"
+
+Resources:
+###############################################################################
+# Security Group
+###############################################################################
+#--------------------------------------
+# For Administration 
+#--------------------------------------
+  TastylogAdminSvSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "tastylog administration security group "
+      VpcId: !ImportValue "TastylogVPC-VPCID"
+      SecurityGroupIngress:
+        - Description: "for ssh"
+          IpProtocol: "tcp"
+          FromPort: "22"
+          ToPort: "22"
+          CidrIp: !Ref "IpRangeAll"
+        - Description: "for tcp 3000"
+          IpProtocol: tcp
+          FromPort: "3000"
+          ToPort: "3000"
+          CidrIp: !Ref "IpRangeAll"
+        - Description: "for icmp echo request"
+          IpProtocol: "icmp"
+          # https://www.iana.org/assignments/icmp-parameters/icmp-parameters.xhtml
+          FromPort: "8" # ICMP TYPE : Echo Request
+          ToPort: "-1" # all ICMP codes
+          CidrIp: !Ref "IpRangeAll"
+      SecurityGroupEgress:
+        - Description: "for http"
+          IpProtocol: "tcp"
+          FromPort: "80"
+          ToPort: "80"
+          CidrIp: !Ref "IpRangeAll"
+        - Description: "for https"
+          IpProtocol: "tcp"
+          FromPort: "443"
+          ToPort: "443"
+          CidrIp: !Ref "IpRangeAll"
+
+#--------------------------------------
+# Web Server
+#--------------------------------------
+  TastylogWebSvSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "tastylog web server security group "
+      VpcId: !ImportValue "TastylogVPC-VPCID"
+      SecurityGroupIngress:
+        - Description: "for http"
+          IpProtocol: "tcp"
+          FromPort: "80"
+          ToPort: "80"
+          CidrIp: !Ref "IpRangeAll"
+        - Description: "for https"
+          IpProtocol: "tcp"
+          FromPort: "443"
+          ToPort: "443"
+          CidrIp: !Ref "IpRangeAll"
+
+  # Using embedded ingress and egress rules which contain cross-reference two security groups
+  # causes circular depencency error.
+  # Outbound rule
+  # -> App Server
+  TastylogWebSvSGEgress1:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      Description: "for tcp 3000"
+      IpProtocol: "tcp"
+      FromPort: "3000"
+      ToPort: "3000"
+      DestinationSecurityGroupId: !GetAtt "TastylogApSvSG.GroupId"
+      GroupId: !GetAtt "TastylogWebSvSG.GroupId"
+
+#--------------------------------------
+# Application Server
+#--------------------------------------
+  TastylogApSvSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "tastylog application server security group "
+      VpcId: !ImportValue "TastylogVPC-VPCID"
+      SecurityGroupEgress:
+        - Description: "for http : S3"
+          IpProtocol: "tcp"
+          FromPort: "80"
+          ToPort: "80"
+          DestinationPrefixListId: !Ref "PrefixIdS3" # managed prefix list: com.amazonaws.ap-northeast-1.s3
+        - Description: "for https : S3"
+          IpProtocol: "tcp"
+          FromPort: "443"
+          ToPort: "443"
+          DestinationPrefixListId: !Ref "PrefixIdS3" # managed prefix list: com.amazonaws.ap-northeast-1.s3
+        # needs if use Systems Manager Session Manager
+        - Description: "for https (Systems Manager Session Manager)"
+          IpProtocol: "tcp"
+          FromPort: "443"
+          ToPort: "443"
+          CidrIp: !Ref "IpRangeAll" # allow all https outbound
+
+  # Using embedded ingress and egress rules which contain cross-reference two security groups
+  # causes circular depencency error.
+  # Inbound rule
+  # Web Server -> 
+  TastylogApSvSGIngress1:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: "for tcp 3000"
+      IpProtocol: "tcp"
+      FromPort: "3000"
+      ToPort: "3000"
+      SourceSecurityGroupId: !GetAtt "TastylogWebSvSG.GroupId"
+      GroupId: !GetAtt "TastylogApSvSG.GroupId"
+
+  # Outbound rule
+  # -> DB Server
+  TastylogApSvSGEgress1:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      Description: "for tcp 3306 : MySQL/Aurora"
+      IpProtocol: "tcp"
+      FromPort: "3306"
+      ToPort: "3306"
+      DestinationSecurityGroupId: !GetAtt "TastylogDbSvSG.GroupId"
+      GroupId: !GetAtt "TastylogApSvSG.GroupId"
+
+#--------------------------------------
+# DB Server
+#--------------------------------------
+  TastylogDbSvSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "tastylog DB server security group "
+      VpcId: !ImportValue "TastylogVPC-VPCID"
+      SecurityGroupEgress:
+        # If you want to remove the default rule and limit egress traffic to just the localhost (127.0.0.1/32)
+        # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html#aws-properties-ec2-security-group--examples
+        - Description: "Remove default outbound rule"
+          CidrIp: "127.0.0.1/32"
+          IpProtocol: "-1"
+
+  # Using embedded ingress and egress rules which contain cross-reference two security groups
+  # causes circular depencency error.
+  # Inbound rule
+  # App Server ->
+  TastylogApDbSGIngress1:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: "for tcp 3306 : MySQL/Aurora"
+      IpProtocol: "tcp"
+      FromPort: "3306"
+      ToPort: "3306"
+      SourceSecurityGroupId: !GetAtt "TastylogApSvSG.GroupId"
+      GroupId: !GetAtt "TastylogDbSvSG.GroupId"
+
+Outputs:
+  StackTastylogAdminSvSG:
+    Description: "The ID of the Administration Security Group"
+    Value: !Ref "TastylogAdminSvSG"
+    Export:
+      Name: !Sub "${AWS::StackName}-adminSG"
+
+  StackTastylogWebSvSG:
+    Description: "The ID of the Web Server Security Group"
+    Value: !Ref "TastylogWebSvSG"
+    Export:
+      Name: !Sub "${AWS::StackName}-webSG"
+
+  StackTastylogApSvSG:
+    Description: "The ID of the Application Server Security Group"
+    Value: !Ref "TastylogApSvSG"
+    Export:
+      Name: !Sub "${AWS::StackName}-apSG"
+
+  StackTastylogDbSvSG:
+    Description: "The ID of the DB Server Security Group"
+    Value: !Ref "TastylogDbSvSG"
+    Export:
+      Name: !Sub "${AWS::StackName}-dbSG"

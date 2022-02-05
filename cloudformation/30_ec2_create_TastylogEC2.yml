@@ -1,0 +1,105 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Create EC2 Instance
+
+Parameters:
+  Ec2ImageId:
+    Type: "AWS::SSM::Parameter::Value<String>"
+    Default: "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
+  Ec2InstanceType:
+    Type: "String"
+    Default: "t2.micro"
+  KeyName: 
+    Description : "Name of an existing EC2 KeyPair."
+    Type: "AWS::EC2::KeyPair::KeyName"
+    Default: "aws-udemy"
+    ConstraintDescription : "Can contain only ASCII characters."
+
+Resources:
+###############################################################################
+# EC2 instance
+###############################################################################
+  TastylogApServer1A:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref "Ec2ImageId"
+#      InstanceType: !Ref "Ec2InstanceType"
+      LaunchTemplate:
+        LaunchTemplateId: !Ref "ECSpotLaunchTemplate"
+        Version: !GetAtt "ECSpotLaunchTemplate.LatestVersionNumber"
+#      SubnetId: !ImportValue "TastylogVPC-PublicSubnet1A"
+      KeyName: !Ref "KeyName"
+      NetworkInterfaces: 
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          GroupSet: 
+            - !ImportValue "TastylogSG-adminSG"
+            - !ImportValue "TastylogSG-apSG"
+          SubnetId: !ImportValue "TastylogVPC-PublicSubnet1A"
+      BlockDeviceMappings:
+        - DeviceName: "/dev/xvda"
+          Ebs:
+            DeleteOnTermination: "true" # the EBS volume is deleted on instance termination (default)
+            VolumeType: "gp2" # General Purpose SSD (default)
+            VolumeSize: "8" # 8GB (default)
+      Tags:
+        - Key: "Name"
+          Value: "TastylogApServer1A"
+        - Key: "Type"
+          Value: "app"
+
+  TastylogApServer1C:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref "Ec2ImageId"
+#      InstanceType: !Ref "Ec2InstanceType"
+      LaunchTemplate:
+        LaunchTemplateId: !Ref "ECSpotLaunchTemplate"
+        Version: !GetAtt "ECSpotLaunchTemplate.LatestVersionNumber"
+#      SubnetId: !ImportValue "TastylogVPC-PublicSubnet1A"
+      KeyName: !Ref "KeyName"
+      NetworkInterfaces: 
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          GroupSet: 
+            - !ImportValue "TastylogSG-adminSG"
+            - !ImportValue "TastylogSG-apSG"
+          SubnetId: !ImportValue "TastylogVPC-PublicSubnet1C"
+      BlockDeviceMappings:
+        - DeviceName: "/dev/xvda"
+          Ebs:
+            DeleteOnTermination: "true" # the EBS volume is deleted on instance termination (default)
+            VolumeType: "gp2" # General Purpose SSD (default)
+            VolumeSize: "8" # 8GB (default)
+      Tags:
+        - Key: "Name"
+          Value: "TastylogApServer1C"
+        - Key: "Type"
+          Value: "app"
+
+  ECSpotLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        InstanceType: !Ref "Ec2InstanceType"
+        InstanceMarketOptions:
+          MarketType: "spot"
+          SpotOptions:
+            InstanceInterruptionBehavior: "terminate" # hibernate | stop | terminate
+            MaxPrice: !Ref "AWS::NoValue" # OnDemand
+            SpotInstanceType: "one-time" # one-time | persistent
+        # attach IAM role
+        IamInstanceProfile:
+          Name: !ImportValue "TastylogRole-InstanceProfileName"
+
+Outputs:
+  StackTastylogApServer1A:
+    Description: "The ID of the ApServer1A instance"
+    Value: !Ref "TastylogApServer1A"
+    Export:
+      Name: !Sub "${AWS::StackName}-ApServer1A"
+
+  StackTastylogApServer1C:
+    Description: "The ID of the ApServer1C instance"
+    Value: !Ref "TastylogApServer1C"
+    Export:
+      Name: !Sub "${AWS::StackName}-ApServer1C"
